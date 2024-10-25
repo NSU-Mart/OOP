@@ -1,0 +1,82 @@
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <list>
+#include <map>
+#include <cctype>
+#include <iomanip>
+#include <algorithm>
+
+// Функция для разделения строки на слова, используя разделители
+std::list<std::string> splitWords(const std::string& line) {
+    std::list<std::string> words;
+    std::string word;
+
+    for (char ch : line) {
+        if (std::isalnum(ch)) {
+            word += std::tolower(ch); // Приводим символ к нижнему регистру
+        } else if (!word.empty()) {
+            words.push_back(word);
+            word.clear();
+        }
+    }
+
+    if (!word.empty()) {
+        words.push_back(word);
+    }
+    return words;
+}
+
+// Основная функция программы
+int main() {
+    const std::string inputFileName = "text.txt";   // Фиксированное имя входного файла
+    const std::string outputFileName = "output.csv"; // Фиксированное имя выходного файла
+
+    std::ifstream inputFile(inputFileName);
+    if (!inputFile.is_open()) {
+        std::cerr << "Error: Cannot open input file " << inputFileName << std::endl;
+        return 1;
+    }
+
+    std::map<std::string, int> wordFrequency;
+    std::string line;
+    int totalWords = 0;
+
+    // Считываем строки из файла и подсчитываем частоту слов
+    while (std::getline(inputFile, line)) {
+        std::list<std::string> words = splitWords(line);
+        for (const std::string& word : words) {
+            ++wordFrequency[word];
+            ++totalWords;
+        }
+    }
+    inputFile.close();
+
+    // Преобразуем карту в список для сортировки
+    std::list<std::pair<std::string, int>> sortedWords(wordFrequency.begin(), wordFrequency.end());
+    sortedWords.sort([](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
+        return b.second < a.second; // Сортировка по убыванию частоты
+    });
+
+    // Открываем CSV файл для записи
+    std::ofstream outputFile(outputFileName);
+    if (!outputFile.is_open()) {
+        std::cerr << "Error: Cannot open output file " << outputFileName << std::endl;
+        return 1;
+    }
+
+    // Записываем заголовок CSV
+    outputFile << "Слово,Частота,Частота (%)" << std::endl;
+
+    // Записываем данные в CSV файл
+    for (const auto& entry : sortedWords) {
+        double frequencyPercent = static_cast<double>(entry.second) / totalWords * 100;
+        outputFile << entry.first << "," << entry.second << ","
+                   << std::fixed << std::setprecision(2) << frequencyPercent << std::endl;
+    }
+    outputFile.close();
+
+    std::cout << "CSV файл успешно создан: " << outputFileName << std::endl;
+    return 0;
+}
