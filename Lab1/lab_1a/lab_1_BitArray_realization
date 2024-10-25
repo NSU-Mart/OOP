@@ -1,0 +1,216 @@
+#include <iostream>
+#include <vector>
+#include <stdexcept>
+#include <string>
+#include <algorithm>
+#include <sstream>
+
+class BitArray {
+public:
+    // Default constructor, creates an empty bit array.
+    // Конструктор по умолчанию, создающий пустой битовый массив.
+    BitArray() = default;
+
+    // Constructor that creates a bit array with a given number of bits.
+    // Optionally initializes the first sizeof(long) bits with the value parameter.
+    // Конструктор, создающий битовый массив заданного размера.
+    // Опционально инициализирует первые sizeof(long) бит значением параметра value.
+    explicit BitArray(int num_bits, unsigned long value = 0) 
+        : num_bits_(num_bits), bits_((num_bits + 31) / 32, 0) { // Each int holds 32 bits
+        if (num_bits < 0) throw std::invalid_argument("Number of bits cannot be negative");
+        // Если num_bits < 0, выбрасывается исключение
+        for (int i = 0; i < std::min(num_bits, 32); ++i) {
+            if ((value >> i) & 1) set(i); // Set bits according to the value parameter
+            // Устанавливает биты в соответствии с параметром value
+        }
+    }
+
+    // Copy constructor.
+    // Конструктор копирования.
+    BitArray(const BitArray& b) = default;
+
+    // Assignment operator.
+    // Оператор присваивания.
+    BitArray& operator=(const BitArray& b) = default;
+
+    // Swaps content of two BitArrays.
+    // Обменивает содержимое двух битовых массивов.
+    void swap(BitArray& b) {
+        std::swap(bits_, b.bits_);
+        std::swap(num_bits_, b.num_bits_);
+    }
+
+    // Resizes the bit array to the specified number of bits.
+    // New bits are initialized with the value parameter.
+    // Изменяет размер битового массива.
+    // Новые биты инициализируются значением параметра value.
+    void resize(int num_bits, bool value = false) {
+        if (num_bits < 0) throw std::invalid_argument("Number of bits cannot be negative");
+        // Если num_bits < 0, выбрасывается исключение
+        int old_num_bits = num_bits_;
+        num_bits_ = num_bits;
+        bits_.resize((num_bits + 31) / 32, value ? ~0 : 0); // Resize underlying storage
+        // Изменение размера хранилища с учетом new bits
+        if (value && num_bits > old_num_bits) {
+            for (int i = old_num_bits; i < num_bits; ++i) set(i, value); // Set new bits if necessary
+            // Устанавливает новые биты в единицу, если value == true
+        }
+    }
+
+    // Clears the bit array.
+    // Очищает битовый массив.
+    void clear() {
+        std::fill(bits_.begin(), bits_.end(), 0); // Fill all bits with 0
+        // Заполняет все биты нулями
+        num_bits_ = 0;
+    }
+
+    // Adds a bit to the end of the array, resizing if needed.
+    // Добавляет бит в конец массива, изменяя размер при необходимости.
+    void push_back(bool bit) {
+        resize(num_bits_ + 1, bit); // Increase size by 1 and set the last bit
+        // Увеличивает размер на 1 и устанавливает последний бит
+        set(num_bits_ - 1, bit);
+    }
+
+    // Bitwise AND operation with another BitArray of the same size.
+    // Побитовое И с другим битовым массивом того же размера.
+    BitArray& operator&=(const BitArray& b) {
+        checkSizeEqual(b);
+        for (size_t i = 0; i < bits_.size(); ++i) {
+            bits_[i] &= b.bits_[i];
+        }
+        return *this;
+    }
+
+    // Bitwise OR operation with another BitArray of the same size.
+    // Побитовое ИЛИ с другим битовым массивом того же размера.
+    BitArray& operator|=(const BitArray& b) {
+        checkSizeEqual(b);
+        for (size_t i = 0; i < bits_.size(); ++i) {
+            bits_[i] |= b.bits_[i];
+        }
+        return *this;
+    }
+
+    // Bitwise XOR operation with another BitArray of the same size.
+    // Побитовое исключающее ИЛИ с другим битовым массивом того же размера.
+    BitArray& operator^=(const BitArray& b) {
+        checkSizeEqual(b);
+        for (size_t i = 0; i < bits_.size(); ++i) {
+            bits_[i] ^= b.bits_[i];
+        }
+        return *this;
+    }
+
+    // Left bit shift by n positions, filling new bits with zeros.
+    // Логический сдвиг влево на n позиций с заполнением новых бит нулями.
+    BitArray& operator<<=(int n) {
+        if (n < 0) throw std::invalid_argument("Shift count cannot be negative");
+        // Если n < 0, выбрасывается исключение
+        // Логика сдвига будет реализована здесь.
+        return *this;
+    }
+
+    // Right bit shift by n positions, filling new bits with zeros.
+    // Логический сдвиг вправо на n позиций с заполнением новых бит нулями.
+    BitArray& operator>>=(int n) {
+        if (n < 0) throw std::invalid_argument("Shift count cannot be negative");
+        // Если n < 0, выбрасывается исключение
+        // Логика сдвига будет реализована здесь.
+        return *this;
+    }
+
+    // Sets the bit at index n to the specified value.
+    // Устанавливает бит в позиции n в указанное значение.
+    BitArray& set(int n, bool val = true) {
+        if (n < 0 || n >= num_bits_) throw std::out_of_range("Index out of bounds");
+        // Если n вне границ массива, выбрасывается исключение
+        if (val)
+            bits_[n / 32] |= (1U << (n % 32)); // Set bit
+            // Устанавливает бит
+        else
+            bits_[n / 32] &= ~(1U << (n % 32)); // Clear bit
+            // Сбрасывает бит
+        return *this;
+    }
+
+    // Clears the bit at index n.
+    // Сбрасывает бит в позиции n.
+    BitArray& reset(int n) {
+        return set(n, false);
+    }
+
+    // Returns true if any bit in the array is set to 1.
+    // Возвращает true, если любой бит установлен в 1.
+    bool any() const {
+        for (const auto& word : bits_) {
+            if (word != 0) return true;
+            // Если найден ненулевой элемент, возвращает true
+        }
+        return false;
+    }
+
+    // Returns true if all bits in the array are set to 0.
+    // Возвращает true, если все биты сброшены в 0.
+    bool none() const {
+        return !any();
+        // Проверяет, что ни один бит не установлен
+    }
+
+    // Counts the number of set bits.
+    // Подсчитывает количество установленных битов.
+    int count() const {
+        int cnt = 0;
+        for (const auto& word : bits_) {
+            cnt += __builtin_popcount(word); // Counts bits set to 1
+            // Подсчитывает количество битов, установленных в 1
+        }
+        return cnt;
+    }
+
+    // Returns the value of the bit at index i.
+    // Возвращает значение бита в позиции i.
+    bool operator[](int i) const {
+        if (i < 0 || i >= num_bits_) throw std::out_of_range("Index out of bounds");
+        // Если i вне границ массива, выбрасывается исключение
+        return (bits_[i / 32] >> (i % 32)) & 1;
+        // Возвращает значение бита
+    }
+
+    // Returns the total number of bits in the array.
+    // Возвращает общее количество битов в массиве.
+    int size() const {
+        return num_bits_;
+    }
+
+    // Checks if the array is empty (zero size).
+    // Проверяет, пуст ли массив (размер равен нулю).
+    bool empty() const {
+        return num_bits_ == 0;
+    }
+
+    // Returns a string representation of the bit array.
+    // Возвращает строковое представление битового массива.
+    std::string to_string() const {
+        std::ostringstream oss;
+        for (int i = num_bits_ - 1; i >= 0; --i) {
+            oss << ((*this)[i] ? '1' : '0');
+            // Преобразует каждый бит в строку
+        }
+        return oss.str();
+    }
+
+private:
+    int num_bits_ = 0; // Number of bits in the array
+    // Число битов в массиве
+    std::vector<unsigned int> bits_; // Underlying storage for the bits
+    // Хранилище для битов
+
+    // Ensures that two arrays are of equal size.
+    // Проверяет, что два массива имеют одинаковый размер.
+    void checkSizeEqual(const BitArray& b) const {
+        if (num_bits_ != b.num_bits_) throw std::invalid_argument("Sizes must match");
+        // Если размеры массивов не совпадают, выбрасывается исключение
+    }
+};
